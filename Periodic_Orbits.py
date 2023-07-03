@@ -3,8 +3,187 @@ from scipy.integrate import odeint
 import matplotlib.pyplot as plt
 import pandas as pd
 
+class Orbit_Generator:
+
+    def __init__(self, user_defined, skip):
+        """
+        Initializer for the generation of periodic orbits in various systems. Namely, Halo,
+        Vertical Lyapunov, and Horizontal Lyapunov orbits, using Howell's method.
+        :param user_defined: is a tuple containing a set of initial conditions and the gravitational
+                            parameter.
+                        user_defined[0] : the initial conditions, a list containing:
+                                       ini_cond = [initial_state vector, continuation vector, number of families, identifier]
+                                    initial_state vector: [x, y, z, xdot, ydot, zdot]
+                                    continuation vector: [dx, dy, dz, dxdot, dydot, dzdot]
+                                    number of families: number of families to continue for, an integer
+                                    identifier: 'hlyap', 'vlyap' or 'halo' (for plotting purposes)
+                                It can be a list of lists containing multiple initial conditions, as:
+                                    ini_conds = [ini_cond1, ini_cond2, ...]
+                        user_defined[1] : the gravitaional parameter (mu) to be used
+                        should be empty if being skipped
+        :param skip: this is for the user to decide if they want to go through a guided initialization
+                    process or specify directly
+        """
+
+        if not skip:
+            self.orbit_type = input("Choose which Type of Orbit you would like: \n 1. Halo \n 2. Vertical Lyapunov \n 3."
+                                    " Planar Lyapunov \n 4. All three")
+
+            sys = input("Choose which system you would like to investigate: \n 1. Earth-Moon \n 2. Sun-Earth/Moon"
+                                "\n 3. mu = 0.04 (from Howell's paper, only for Halo L1) \n 4. Specify your own")
+
+            mu_SE = 3.04042e-6
+            mu_em = 0.0121505856
+            mu_howell = 0.04
+
+            if sys == '1':
+                self.mu = mu_em
+            elif sys == '2':
+                self.mu = mu_SE
+            elif sys == '3':
+                self.mu = mu_howell
+            else:
+                self.mu = float(input("What is your desired mu"))
+
+            self.obs_location = input("Where would you like the orbits located: \n 1. L1 \n 2. L2 \n 3. L1 and L2")
+
+            self.big_primary =[-self.mu, 0., 0.]
+            self.small_primary = [1 - self.mu, 0., 0.]
+
+            # Get position of L_1 and L_2 by solving the quintic polynomial, gives distance relative to closest primary
+            quintic_poly_l1 = [1., -(3 - self.mu), 3 - 2 * self.mu, -self.mu, 2 * self.mu, -self.mu]
+            roots = np.roots(quintic_poly_l1)
+            self.L_1 = [self.small_primary[0] - roots.real[abs(roots.imag) < 1e-5][0], 0., 0.]
+
+            quintic_poly_l2 = [1., (3 - self.mu), 3 - 2 * self.mu, -self.mu, -2 * self.mu, -self.mu]
+            roots_l2 = np.roots(quintic_poly_l2)
+            self.L_2 = [self.small_primary[0] + roots_l2.real[abs(roots_l2.imag) < 1e-5][0], 0., 0.]
+
+            # Initial conditions
+            halo_SE_L1_ini = [1.0000599364305272, 0.0, 0.0021185527811233, 0.0, -0.05128769156354202, 0.0]  # max around 290
+            halo_SE_L2_ini = [1.0000, 0.0, -0.002538552781123301, 0.0, 0.04651063631928344, 0.0] # max around 210
+            halo_em_L1_ini = [0.8989995853538256, 0.0, -0.3906000000000003, 0.0, 0.10213119259847761, 0.0] # mu = em for Halo L1
+            halo_howell_L1_ini = [0.7232683951677348, 0.0, 0.04, 0.0, 0.19801932688532664, 0.0]  # mu = 0.04 from Howell for halo L1
+            vlyap_SE_L1_ini = [0.9903500018005715, 6.73776287e-09, 0.0, -1.27840278e-08, 0.0007718472800000006,
+                               -0.010417215114751176]  # max is 100
+
+            hlyap_SE_L1_ini = [0.9791554733155445, 0.0, 0.0, 0.0, 0.041713004131169205, 0.0]  # max 100
+            hlyap_SE_L2_ini = [1.0176999999999994, 0.0, 0.0, 0.0, -0.0357697193603642, 0.0]  # max 70
+            hlyap_em_L1_ini = [0.7816, 0., 0., 0., 0.4432, 0.]  # mu = em for Horizontal Lyapunov L1
+
+            if self.orbit_type == '1':  # Only Halo
+                if self.mu == mu_SE:
+                    if self.obs_location == '1':
+                        families = int(input("Number of Families desired to view (max 290)"))
+                        continuation = np.array([0., 0., 0.00001, 0., 0.000, 0.000])
+                        self.initial_conditions = [halo_SE_L1_ini, continuation, families, 'halo']
+                    elif self.obs_location == '2':
+                        families = int(input("Number of Families desired to view (max 210)"))
+                        continuation = np.array([0., 0., 0.00001, 0., 0.000, 0.000])
+                        self.initial_conditions = [halo_SE_L2_ini, continuation, families, 'halo']
+                    else:
+                        family_l1 = int(input("Number of Families desired to view for L1 (max 290)"))
+                        family_l2 = int(input("Number of Families desired to view for L2 (max 210)"))
+                        continuation = np.array([0., 0., 0.00001, 0., 0.000, 0.000])
+                        self.initial_conditions = [[halo_SE_L1_ini, continuation, family_l1, 'halo'],
+                                                   [halo_SE_L2_ini, continuation, family_l2, 'halo']]
+                elif self.mu == mu_em:
+                    print("Only L1 available")
+                    families = int(input("Number of Families desired to view (max unknown)"))
+                    continuation = np.array([0., 0., 0.00001, 0., 0.000, 0.000])
+                    self.initial_conditions = [halo_em_L1_ini, continuation, families, 'halo']
+                elif self.mu == mu_howell:
+                    print("Only L1 available")
+                    families = int(input("Number of Families desired to view (max unknown)"))
+                    continuation = np.array([0., 0., 0.00001, 0., 0.000, 0.000])
+                    self.initial_conditions = [halo_howell_L1_ini, continuation, families, 'halo']
+                else:
+                    ini_cond = input("What is your initial state?")
+                    families = input("How many families?")
+                    continuation = np.array(input("Continuation vector?"))
+                    self.initial_conditions = [ini_cond, continuation, families, 'halo']
+            elif self.orbit_type == '2':  # vert lyapunov
+                if self.mu == mu_SE:
+                    families = int(input("Number of Families desired to view (max 100)"))
+                    continuation = np.array([0.000, 0., 0., 0., 0.0001, -0.0001])
+                    self.initial_conditions = [vlyap_SE_L1_ini, continuation, families, 'vlyap']
+                else:
+                    print("We only have Sun-Earth/Moon system for L1")
+                    ini_cond = input("What is your initial state?")
+                    families = input("How many families?")
+                    continuation = np.array(input("Continuation vector?"))
+                    self.initial_conditions = [ini_cond, continuation, families, 'vlyap']
+            elif self.orbit_type == '3':  # hlyap
+                print("No Howell available, no L2 for EMS")
+                if self.mu == mu_SE:
+                    if self.obs_location == '1':
+                        families = int(input("Number of Families desired to view (max 100)"))
+                        continuation =  np.array([0.0001, 0., 0., 0., 0.000, 0.000])
+                        self.initial_conditions = [hlyap_SE_L1_ini, continuation, families, 'hlyap']
+                    elif self.obs_location == '2':
+                        families = int(input("Number of Families desired to view (max 70)"))
+                        continuation = np.array([-0.0001, 0., 0., 0.000, 0.0001, 0.000])
+                        self.initial_conditions = [hlyap_SE_L2_ini, continuation, families, 'hlyap']
+                    else:
+                        family_l1 = int(input("Number of Families desired to view for L1 (max 100)"))
+                        family_l2 = int(input("Number of Families desired to view for L2 (max 70)"))
+                        continuation_l1 = np.array([0.0001, 0., 0., 0., 0.000, 0.000])
+                        continuation_l2 = np.array([-0.0001, 0., 0., 0.000, 0.0001, 0.000])
+                        self.initial_conditions = [[hlyap_SE_L1_ini, continuation_l1, family_l1, 'hlyap'],
+                                                   [hlyap_SE_L2_ini, continuation_l2, family_l2, 'hlyap']]
+                elif self.mu == mu_em:
+                    print("Only L1 available")
+                    families = int(input("Number of Families desired to view (max unknown)"))
+                    continuation = np.array([0.0001, 0., 0., 0., 0.000, 0.000])
+                    self.initial_conditions = [hlyap_em_L1_ini, continuation, families, 'hlyap']
+                else:
+                    ini_cond = input("What is your initial state?")
+                    families = input("How many families?")
+                    continuation = np.array(input("Continuation vector?"))
+                    self.initial_conditions = [ini_cond, continuation, families, 'halo']
+            else:  # all three
+                print("Sun-Earth/Moon Only")
+                family_l1 = int(input("Number of Families desired to view for L1 Hor. Lyap. (max 100)"))
+                family_l2 = int(input("Number of Families desired to view for L2 Hor. Lyap. (max 70)"))
+                continuation_l1 = np.array([0.0001, 0., 0., 0., 0.000, 0.000])
+                continuation_l2 = np.array([-0.0001, 0., 0., 0.000, 0.0001, 0.000])
+                ini_cond_hlyap_l1 =[hlyap_SE_L1_ini, continuation_l1, family_l1, 'hlyap']
+                ini_cond_hlyap_l2 = [hlyap_SE_L2_ini, continuation_l2, family_l2, 'hlyap']
+                families = int(input("Number of Families desired to view Vertical Lyap L1 (max 100)"))
+                continuation = np.array([0.000, 0., 0., 0., 0.0001, -0.0001])
+                ini_cond_vlyap_l1 = [vlyap_SE_L1_ini, continuation, families, 'vlyap']
+                family_l1 = int(input("Number of Families desired to view for L1 (max 290)"))
+                family_l2 = int(input("Number of Families desired to view for L2 (max 210)"))
+                continuation = np.array([0., 0., 0.00001, 0., 0.000, 0.000])
+                ini_cond_halo_l1 = [halo_SE_L1_ini, continuation, family_l1, 'halo']
+                ini_cond_halo_l2 = [halo_SE_L2_ini, continuation, family_l2, 'halo']
+                self.initial_conditions = [ini_cond_hlyap_l1, ini_cond_hlyap_l2, ini_cond_vlyap_l1,
+                                           ini_cond_halo_l1, ini_cond_halo_l2]
+
+        else:
+            self.initial_conditions = user_defined[0]
+            self.mu = user_defined[1]
+            self.big_primary = [-self.mu, 0., 0.]
+            self.small_primary = [1 - self.mu, 0., 0.]
+
+            # Get position of L_1 and L_2 by solving the quintic polynomial, gives distance relative to closest primary
+            quintic_poly_l1 = [1., -(3 - self.mu), 3 - 2 * self.mu, -self.mu, 2 * self.mu, -self.mu]
+            roots = np.roots(quintic_poly_l1)
+            self.L_1 = [self.small_primary[0] - roots.real[abs(roots.imag) < 1e-5][0], 0., 0.]
+
+            quintic_poly_l2 = [1., (3 - self.mu), 3 - 2 * self.mu, -self.mu, -2 * self.mu, -self.mu]
+            roots_l2 = np.roots(quintic_poly_l2)
+            self.L_2 = [self.small_primary[0] + roots_l2.real[abs(roots_l2.imag) < 1e-5][0], 0., 0.]
+
 
 def correct_x_halo(state, mu):
+    """
+    corrects the initial condition set to generate a periodic halo orbit, using Howell's method,
+    see paper for details
+    :param state: the 42 element state vector
+    :param mu: the gravitational parameter being used
+    :return:  correction: the correction to the state to be made
+    """
 
     # deconstruct state
     x, y, z, vx, vy, vz = state[0:6]  # position and velocity
@@ -31,6 +210,13 @@ def correct_x_halo(state, mu):
 
 
 def correct_z_halo(state, mu):
+    """
+        corrects the initial condition set to generate a periodic halo orbit, using Howell's method,
+        see paper for details
+        :param state: the 42 element state vector
+        :param mu: the gravitational parameter being used
+        :return:  correction: the correction to the state to be made
+        """
     # deconstruct state
     x, y, z, vx, vy, vz = state[:6]  # position and velocity
     phi = np.reshape(state[6:], (6, 6))
@@ -55,6 +241,14 @@ def correct_z_halo(state, mu):
     return correction
 
 def correct_x_vertical_lyapunov(state, mu):
+    """
+        corrects the initial condition set to generate a periodic vertical lyapunov orbit, using Howell's method,
+        see paper for details
+        :param state: the 42 element state vector
+        :param mu: the gravitational parameter being used
+        :return:  correction: the correction to the state to be made
+        """
+
     # deconstruct state
     x, y, z, vx, vy, vz = state[:6]  # position and velocity
     phi = np.reshape(state[6:], (6, 6))
@@ -76,6 +270,14 @@ def correct_x_vertical_lyapunov(state, mu):
     return correction
 
 def correct_vy_vertical_lyapunov(state, mu):
+    """
+            corrects the initial condition set to generate a periodic vertical lyapunov orbit, using Howell's method,
+            see paper for details
+            :param state: the 42 element state vector
+            :param mu: the gravitational parameter being used
+            :return:  correction: the correction to the state to be made
+            """
+
     # deconstruct state
     x, y, z, vx, vy, vz = state[:6]  # position and velocity
     phi = np.reshape(state[6:], (6, 6))
@@ -98,6 +300,13 @@ def correct_vy_vertical_lyapunov(state, mu):
 
 
 def correct_x_horizontal_lyapunov(state, mu):
+    """
+            corrects the initial condition set to generate a periodic horizontal lyapunov orbit, using Howell's method,
+            see paper for details
+            :param state: the 42 element state vector
+            :param mu: the gravitational parameter being used
+            :return:  correction: the correction to the state to be made
+            """
     # deconstruct state
     x, y, z, vx, vy, vz = state[0:6]  # position and velocity
     phi = np.reshape(state[6:], (6, 6))
@@ -117,6 +326,15 @@ def correct_x_horizontal_lyapunov(state, mu):
 
 
 def gen_F_matrix(x, y, z, mu):
+    """
+
+    :param x: current x
+    :param y: current y
+    :param z: current z
+    :param mu: gravitional parameter
+    :return: the F matrix from Howells method, to update the state transition matrix
+    """
+
 
     F = np.zeros((6, 6))
     F[0:3, 3:6] = np.eye(3)
@@ -179,21 +397,28 @@ def model(state, time, mu=0.01215):
 
 
 def halo_get_initial_X0(guess, mu):
-
+    """
+    This function implements howell's method for identifying initial conditions for generating
+    periodic orbits.
+    :param guess: the initial condition [x0, y0, z0, xdot0, ydot0, zdot0]
+    :param mu: gravitational parameter
+    :return: the correct initial condition
+    """
     # good_X0 = [0.7232683951677348, 0.0, 0.04, 0.0, 0.19801932688532664, 0.0]
-    tol_vx = 1
+    tol_vx = 1  # the initial tolerances, will later be changed to 10e-8
     tol_vz = 1
     # initial condition
     x_0, y_0, z_0, vx_0, vy_0, vz_0 = guess
-    phi_0 = np.eye(6)
-    start = 0
-    time_mult = 1e13
+    phi_0 = np.eye(6)  # the initial state transition matrix
+    start = 0  # the initial time
+    time_mult = 1e13  # this is a constant to avoid rounding errors
     end = 4 * time_mult  # temporarily bigger
-    space = 600
-    ident = 0
+    space = 600  # the number of points
+    ident = 0  # if the T/2 has been identified
     X_0 = [x_0, y_0, z_0, vx_0, vy_0, vz_0]  # [x y z vx vy vz] for halo: [x_0 0 z_0 0 vy_0 0]
-    halfT = 0
+    halfT = 0  # the half period of the orbit
 
+    # iterate while the tolerances are too high
     while (tol_vx > 10e-8) and (tol_vz > 10e-8):
 
         # time points
@@ -245,6 +470,14 @@ def halo_get_initial_X0(guess, mu):
     return X_0, halfT, time_mult
 
 def vertical_lyapunov_get_initial_X0(guess, mu):
+    """
+        This function implements howell's method for identifying initial conditions for generating
+        periodic orbits.
+        :param guess: the initial condition [x0, y0, z0, xdot0, ydot0, zdot0]
+        :param mu: gravitational parameter
+        :return: the correct initial condition
+        """
+
     # good_X0 = [0.7232683951677348, 0.0, 0.04, 0.0, 0.19801932688532664, 0.0]
     tol_y = 1
     tol_vx = 1
@@ -261,13 +494,6 @@ def vertical_lyapunov_get_initial_X0(guess, mu):
     crossed_once = 0
     iterations = 0
     while (tol_y > 10e-8) and (tol_vx > 10e-8):
-        # print(iterations)
-        # print(X_0)
-        # if iterations > 20:
-        #     X_0 = guess
-        #     X_0[4] = X_0[4] + 0.00001
-        #     iterations = 0
-        #     continue
 
         # time points
         t = np.linspace(start, end, space)  # time is non-dimensionalized
@@ -318,7 +544,13 @@ def vertical_lyapunov_get_initial_X0(guess, mu):
     return X_0, halfT, time_mult
 
 def horizontal_lyapunov_get_initial_X0(guess, mu):
-
+    """
+        This function implements howell's method for identifying initial conditions for generating
+        periodic orbits.
+        :param guess: the initial condition [x0, y0, z0, xdot0, ydot0, zdot0]
+        :param mu: gravitational parameter
+        :return: the correct initial condition
+        """
     tol_vx = 1
     # initial condition
     x_0, y_0, z_0, vx_0, vy_0, vz_0 = guess
@@ -373,12 +605,15 @@ def horizontal_lyapunov_get_initial_X0(guess, mu):
             tol_vx = abs(res[-1, 3])  # at T/2 because we set it as the end previously
         iterations = iterations + 1
 
-
-    print(X_0)
     return X_0, halfT, time_mult
 
 def jacobi(res, mu):
+    """
 
+    :param res: the resultant state vector from a periodic orbit
+    :param mu: the gravitational parameter
+    :return: the jacobi constant
+    """
     x, y, z, vx, vy, vz = res
     r1 = np.sqrt((x + mu) ** 2 + y ** 2)
     r2 = np.sqrt((x - 1 + mu) ** 2 + y ** 2)
@@ -386,59 +621,23 @@ def jacobi(res, mu):
 
     return 2*U - vx**2 - vy**2 - vz**2
 
+skip = 0
+orb_gen = Orbit_Generator([], skip)
+mu = orb_gen.mu
+sun = orb_gen.big_primary
+earth = orb_gen.small_primary
+l_1 = orb_gen.L_1
+l_2 = orb_gen.L_2
+ini_conditions = orb_gen.initial_conditions
 
-# good_X0 = [0.7232683951677348, 0.0, 0.04, 0.0, 0.19801932688532664, 0.0]  # mu = 0.04 from Howell for halo L1
-# good_X0 = [0.8234, 0., 0.0224, 0., 0.1343, 0.]  # mu = em for Halo L1
-# good_X0 = [0.8989995853538256, 0.0, -0.3906000000000003, 0.0, 0.10213119259847761, 0.0] # mu = em for Halo L1
-# good_X0 = [0.7816, 0., 0., 0., 0.4432, 0.]  # mu = em for Horizontal Lyapunov L1
-# good_X0 = [0.7816, 0., 0., 0., 0.4432, 0.0000]  # mu = em for axials L1 - you can use vertical Lyapunov code
-# good_X0 = [0.25, 0., 0., 0., -1.83361401, -1.01998345] # mu = 0.499 for vertical lyapunov l1
-# good_X0 = [ 9.91656301e-01,  6.73776287e-09,  0., -1.27840278e-08, 4.97184728e-03, -2.31393958e-02] # mu = se, l1 vertical lya
-# good_X0 = [0.9903500018005715, 6.73776287e-09, 0.0, -1.27840278e-08, 0.0007718472800000006, -0.010417215114751176] # mu = se, l1 vertical
-# good_X0 = [0.9870554733155437, 0., 0.0, 0., 0.0245251097803396, 0.]  # mu = se, l1 horizontal lyapunov
-# good_X0 = [0.9970496786521372, 0., 0.0050185527811233, 0., -0.025691693196319, 0.]  # mu = se, l1 halo
-# good_X0 = [1.0000599364305272, 0.0, 0.0021185527811233, 0.0, -0.05128769156354202, 0.0] # mu = se, l1 halo
-
-mu_SE = 3.04042e-6
-mu_em = 0.0121505856
-mu = mu_SE
-
-sun = [-mu, 0., 0.]
-earth = [1 - mu, 0., 0.]
-
-quintic_poly_l1 = [1., -(3-mu), 3-2*mu, -mu, 2*mu, -mu]
-roots = np.roots(quintic_poly_l1)
-l_1 = [earth[0] - roots.real[abs(roots.imag) < 1e-5][0], 0. , 0.]
-
-quintic_poly_l2 = [1., (3-mu), 3-2*mu, -mu, -2*mu, -mu]
-roots_l2 = np.roots(quintic_poly_l2)
-l_2 = [earth[0] + roots_l2.real[abs(roots_l2.imag)<1e-5][0], 0., 0.]
-print(l_2)
-
-vlyap_SE_L1_ini = [[0.9903500018005715, 6.73776287e-09, 0.0, -1.27840278e-08, 0.0007718472800000006, -0.010417215114751176],
-                  np.array([0.000, 0., 0., 0., 0.0001, -0.0001]), 70, 'vlyap']  # max is 100
-hlyap_SE_L1_ini = [[0.9870554733155437, 0., 0.0, 0., 0.0245251097803396, 0.], np.array([-0.0001, 0., 0., 0., 0.000, 0.000]),
-                  70, 'hlyap']  # max 80
-hlyap_SE_L1_ini = [[0.9791554733155445, 0.0, 0.0, 0.0, 0.041713004131169205, 0.0], np.array([0.0001, 0., 0., 0., 0.000, 0.000]),
-                  70, 'hlyap']  # max 100
-halo_SE_L1_ini = [[1.0000599364305272, 0.0, 0.0021185527811233, 0.0, -0.05128769156354202, 0.0],
-                  np.array([0., 0., 0.00001, 0., 0.000, 0.000]), 70, 'halo']  # max around 290
-# vlyap_SE_L2_ini = [[1.00900018005715, -6.73776287e-09, 0.0, 1.27840278e-08, -0.0007718472800000006, 0.010417215114751176],
-#                   np.array([0.000, 0., 0., 0., 0.0001, -0.0001]), 2, 'vlyap']
-hlyap_SE_L2_ini = [[1.0176999999999994, 0.0, 0.0, 0.0, -0.0357697193603642, 0.0], np.array([-0.0001, 0., 0., 0.000, 0.0001, 0.000]),
-                 70, 'hlyap']  # max is 70
-halo_SE_L2_ini = [[1.0000, 0.0, -0.002538552781123301, 0.0, 0.04651063631928344, 0.0],
-                  np.array([0., 0., 0.00001, 0., 0.000, 0.000]), 70, 'halo']  # max around 210
-ini_conditions = [vlyap_SE_L1_ini, hlyap_SE_L1_ini, halo_SE_L1_ini, hlyap_SE_L2_ini, halo_SE_L2_ini]
-# ini_conditions = [hlyap_SE_L1_ini]
-
-space = 1200
-start = 0
-phi_0 = np.eye(6)
-results = [[], [], []]
+space = 1200  # number of points to plot
+start = 0  # start time
+phi_0 = np.eye(6)  # initial Phi (state transition matrix)
+results = [[], [], [], [], []]
 plt.figure(4)
 ax = plt.axes(projection='3d')
 
+# iterate over the number of types of orbits
 for ini_cond in ini_conditions:
 
     print(ini_cond[3])
@@ -446,10 +645,12 @@ for ini_cond in ini_conditions:
     ini_guess = ini_cond[0]
     continuation = ini_cond[1]
 
+    # iterate over the number of families to be integrated
     for i in range(num_families):
 
         print(i)
 
+        # check the identifier to apply the specific howell's method
         if ini_cond[3] == 'vlyap':
             X_0, halfT, time_mult = vertical_lyapunov_get_initial_X0(ini_guess, mu)
             j = 0
@@ -474,7 +675,7 @@ for ini_cond in ini_conditions:
 
         ini_guess = X_0 + continuation  # continuation halo
 
-# fix the plotting to grab correct values
+# iterate over the generated orbit types
 for i in range(len(results)):
 
     reses = results[i]
@@ -482,9 +683,11 @@ for i in range(len(results)):
     for j in range(len(reses)):
 
         resi = reses[j]
-        cj = [jacobi(resij, mu) for resij in resi]
+        cj = [jacobi(resij, mu) for resij in resi]  # calculate the jacobi constant of the trajectory
         df = pd.DataFrame(resi, columns=["x", "y", "z", "vx", "vy", "vz"])
         df["cj"] = cj
+
+        # can save to csv with the following line
         # df.to_csv('Horizontal Lyapunov Orbits - L1 - Sun and EMS - Integrations Results/' + str(cj[0]),
         #           sep=" ", header=True, index=None)
 
@@ -509,6 +712,7 @@ for i in range(len(results)):
                 color = 'g'
                 label = None
 
+        # change this value to modify the number of orbits plotted
         if j % 20 == 0:
             plt.figure(1)
             plt.plot(resi[:, 0], resi[:, 1], color=color, label=label)
