@@ -4,6 +4,8 @@ import os
 import matplotlib.pyplot as plt
 import matplotlib.cm as mpl_cm
 
+# Generates a nice figure for lyapunov orbits, based on the Jacobi constant
+
 # Specify the directory path
 directory_l1 = os.path.join(os.getcwd(), 'Horizontal Lyapunov Orbits - L1 - Sun and EMS - Integrations Results')
 directory_l2 = os.path.join(os.getcwd(), 'Horizontal Lyapunov Orbits - L2 - Sun and EMS - Integrations Results')
@@ -87,8 +89,3 @@ ax.set_aspect('equal')
 cbar = fig.colorbar(sc, label='Jacobi Constant')
 plt.show()
 
-
-
-# Import each file
-
-# Plot the x,y as a contour
