@@ -75,7 +75,6 @@ for j in range(0, i-80):
         chopped_ys = np.hstack([chopped_ys, ys_l1[-(1200*j + 1200):-1200*j], ys_l2[-(1200*(j+2) + 1200):-1200*(j+2)]])
 
 r = 579734.2 / 149.e6
-sc = plt.scatter(chopped_xs, chopped_ys, c=chopped_cjs, cmap='coolwarm', s=5)
 plt.scatter(earth[0], earth[1], color='b', label='Earth')
 plt.scatter(l_1[0], l_1[1], color='black', label='L1')
 plt.scatter(l_2[0], l_2[1], color='black', label='L2')
