@@ -22,7 +22,7 @@ def jacobi(res, mu):
 def alpha_beta_jacobi_from_manifolds():
 
     # go through all the files of test particles
-    main_dir = os.path.join(os.getcwd(), 'States_at_EMS')
+    main_dir = os.path.join(os.getcwd(), 'States_at_EMS_new')
     file_list = os.listdir(main_dir)
 
     mu = 3.04042e-6
@@ -30,13 +30,20 @@ def alpha_beta_jacobi_from_manifolds():
     all_alphas = []
     all_betas = []
     all_jacobis = []
+    all_x = []
+    all_y = []
+    all_z = []
+    all_vx = []
+    all_vy = []
+    all_vz = []
+    all_L = []
 
     for idx, file_name in enumerate(file_list):
 
         file_path = os.path.join(main_dir, file_name)
         if os.path.isfile(file_path) and idx > -1:
 
-            print("Reading file: "  + str(file_name))
+            print("Reading file: " + str(file_name))
             data = pd.read_csv(file_path, sep=' ', header=0, names=['x', 'y', 'z', 'vx', 'vy', 'vz', 'L'])
 
             jacobis = []
@@ -62,13 +69,19 @@ def alpha_beta_jacobi_from_manifolds():
                 all_alphas.append(alpha_i)
                 all_betas.append(-beta_i)
                 all_jacobis.append(jacobi_i)
+                all_x.append(data['x'].iloc[i])
+                all_y.append(data['y'].iloc[i])
+                all_z.append(data['z'].iloc[i])
+                all_vx.append(data['vx'].iloc[i])
+                all_vy.append(data['vy'].iloc[i])
+                all_vz.append(data['vz'].iloc[i])
+                all_L.append(data['L'].iloc[i])
 
             data['alpha_I'] = alphas
             data['beta_I'] = betas
             data['Jacobi'] = jacobis
 
-
-            data.to_csv(os.getcwd() + '/States_at_EMS_with_alpha_beta/' + format(jacobis[0], ".15f") + '.csv', sep=' ', header=True, index=False)
+            data.to_csv(os.getcwd() + '/States_at_EMS_with_alpha_beta_new/' + format(jacobis[0], ".15f") + '.csv', sep=' ', header=True, index=False)
 
             # fig, ax = plt.subplots()
             # plt.scatter(1.0, 0., color='b', label='Earth', zorder=15)
@@ -76,22 +89,27 @@ def alpha_beta_jacobi_from_manifolds():
             # plt.scatter(data['x'], data['y'])
             # ax.add_patch(c2)
             # ax.set_aspect('equal')
-
+            #
             fig = plt.figure()
             sc = plt.scatter(alphas, betas, c=jacobis, cmap='coolwarm', s=5)
             cbar = fig.colorbar(sc, label='Jacobi Constant')
-            plt.savefig(os.getcwd() + '/States_at_EMS_with_alpha_beta/' + format(jacobis[0], ".15f") + '_pc.svg', format='svg')
-            # plt.show()
+            plt.savefig(os.getcwd() + '/Figures2/' + format(jacobis[0], ".15f") + '_pc.svg', format='svg')
             plt.close()
 
+    all_data = pd.DataFrame(np.array([all_x, all_y, all_z, all_vx, all_vy, all_vz, all_L, all_alphas, all_betas, all_jacobis]).T,
+                            columns=['x', 'y', 'z', 'vx', 'vy', 'vz', 'L', 'alpha_I', 'beta_I', 'jacobi'])
+
+    all_data.to_csv(os.getcwd() + '/States_at_EMS_with_alpha_beta_new/all_paths.csv', sep=' ', header=True, index=False)
     fig = plt.figure()
-    sc = plt.scatter(all_alphas, all_betas, c=all_jacobis, cmap='gist_rainbow', s=5)
+    sc = plt.scatter(all_alphas, all_betas , c=all_jacobis, cmap='gist_rainbow', s=15)
     cbar = fig.colorbar(sc, label='Jacobi Constant')
-    plt.savefig('Figures/final_alpha_beta_pc.svg', format='svg')
     plt.xlabel(r'$\alpha_I$ (degrees)')
     plt.ylabel(r'$\beta_I$ (degrees)')
     plt.xlim([0, 360])
     plt.ylim([-180, 0])
+    plt.savefig('Figures/final_alpha_beta_pc_2.svg', format='svg')
+    plt.savefig('Figures/final_alpha_beta_pc_2.png', format='png')
+
     plt.show()
     plt.close()
 
@@ -177,6 +195,6 @@ def alpha_beta_jacobi_from_manifolds():
 #
 #
 #
-# alpha_beta_jacobi_from_manifolds()
+alpha_beta_jacobi_from_manifolds()
 # reverse_alpha_beta_jacobi()
 

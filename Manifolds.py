@@ -45,7 +45,7 @@ def model(state, time, mu=0.01215):
     return dXdt
 
 start = 0
-end = 15
+end = 30
 space = 5000
 t = np.linspace(start, end, space)  # time is non-dimensionalized
 mu = 3.04042e-6
@@ -87,7 +87,7 @@ for idx, file_name in enumerate(file_list):
 
     file_path = os.path.join(dir_path, file_name)
     # Check if the current item is a file (not a subdirectory)
-    if os.path.isfile(file_path) and idx > -1:
+    if os.path.isfile(file_path):
         print(idx)
         print("Reading file: " + str(file_name))
         orbit = pd.read_csv(file_path, sep=' ', header=0, names=['x', 'y', 'z', 'vx', 'vy', 'vz', 'cj'])
@@ -110,17 +110,6 @@ for idx, file_name in enumerate(file_list):
         file_path_close = dir_path_l2 + '/' + str(l2_cjs[closest_idx])
         orbit_l2_close = pd.read_csv(file_path_close, sep=' ', header=0, names=['x', 'y', 'z', 'vx', 'vy', 'vz', 'cj'])
 
-        # fig, ax = plt.subplots()
-        # plt.scatter(earth[0], earth[1], color='b', label='Earth', zorder=15)
-        # plt.scatter(l_1[0], l_1[1], color='black', label='L1', zorder=15)
-        # plt.scatter(l_2[0], l_2[1], color='black', label='L2', zorder=15)
-        # c2 = plt.Circle((earth[0], earth[1]), r, linestyle='--', edgecolor='black', alpha=0.1, zorder=15)
-        # ax.add_patch(c2)
-        # ax.set_aspect('equal')
-        # plt.xlabel('Synodic x (non-dimensional)')
-        # plt.ylabel('Synodic y (non-dimensional)')
-        # plt.legend(loc='upper right')
-
         print("Propogating orbit to SOI of EMS for L1....")
         # integrate the L1 orbit for each point of data until it hits the SOI of the EMS
         for i in range(len(orbit['x'])):
@@ -135,31 +124,57 @@ for idx, file_name in enumerate(file_list):
             # identify when inside the sphere of influence of the EMS
             dist = [np.linalg.norm([res[i, 0] - earth[0], res[i, 1] - earth[1], res[i, 2] - earth[2]]) for i in range(len(res))]
 
-            dist_prev = 3.
-            passed_r = 0
-            passed_r_2 = 0
-            passed_r_idx = 0
-            in_ems_idx = np.nan
+            # get soi of ems entries
+            in_ems_idx = []
+            hit = 0
+            if dist[0] < r:
+                inside = 1
+            else:
+                inside = 0
             for idx_ems, value in enumerate(dist):
-                if value < r and passed_r == 0:
-                    pass
-                else:
-                    passed_r = 1
-                    if passed_r_2 == 0:
-                        passed_r_idx = idx_ems
-                        passed_r_2 = 1
-                    dist_curr = value - r
-                    if dist_curr * dist_prev < 0:  # crossed Soi of EMS
-                        in_ems_idx = idx_ems
-                        break
-                    else:
-                        dist_prev = dist_curr.copy()
 
-            if not np.isnan(in_ems_idx):
+                # if we are inside SOI of EMS
+                if value < r:
+                    if inside == 1:  # we were previously inside as well
+                        pass
+                    else:  # we were previously outside
+                        inside = 1
+                        if orbit['cj'].iloc[i] >= 3.00033 and hit == 0:
+                            in_ems_idx.append(idx_ems)
+                            hit = 1
+                        elif orbit['cj'].iloc[i] >= 3.00033 and hit == 1:
+                            pass
+                        else:
+                            in_ems_idx.append(idx_ems)
+                # we are outside the EMS
+                else:
+                    # we were just inside the SOI of the EMS, we are exiting
+                    inside = 0
+
+            # fig, ax = plt.subplots()
+            # plt.scatter(earth[0], earth[1], color='b', label='Earth', zorder=15)
+            # plt.scatter(l_1[0], l_1[1], color='black', label='L1', zorder=15)
+            # plt.scatter(l_2[0], l_2[1], color='black', label='L2', zorder=15)
+            # c2 = plt.Circle((earth[0], earth[1]), r, linestyle='--', edgecolor='black', alpha=0.1, zorder=15)
+            # plt.plot(res[:, 0], res[:, 1])
+            # if in_ems_idx:
+            #     plt.scatter(res[in_ems_idx, 0], res[in_ems_idx, 1])
+            # plt.scatter(res2[:, 0], res2[:, 1])
+            # plt.xlim([0.96, 1.04])
+            # plt.ylim([-0.04, 0.04])
+            # ax.add_patch(c2)
+            # ax.set_aspect('equal')
+            # plt.xlabel('Synodic x (non-dimensional)')
+            # plt.ylabel('Synodic y (non-dimensional)')
+            # plt.legend(loc='upper right')
+            # plt.show()
+
+            if in_ems_idx:
                 # plt.plot(res[passed_r_idx:in_ems_idx, 0], res[passed_r_idx:in_ems_idx, 1], 'blue')
                 # plt.scatter(res[in_ems_idx, 0], res[in_ems_idx, 1])
-                temp = np.append(res[in_ems_idx, :], 1)
-                ems_state.append(temp)
+                for idxs in range(len(in_ems_idx)):
+                    temp = np.append(res[in_ems_idx[idxs], :], 1)
+                    ems_state.append(temp)
 
 
         print("Propogating orbit to SOI of EMS for L2...")
@@ -171,41 +186,51 @@ for idx, file_name in enumerate(file_list):
             state = np.array(X_0)
 
             # solve ODE
-            res = odeint(model, state, t, args=(mu,))
+            res2 = odeint(model, state, t, args=(mu,))
 
             # identify when inside the sphere of influence of the EMS
-            dist = [np.linalg.norm([res[i, 0] - earth[0], res[i, 1] - earth[1], res[i, 2] - earth[2]]) for i in range(len(res))]
+            dist = [np.linalg.norm([res2[i, 0] - earth[0], res2[i, 1] - earth[1], res2[i, 2] - earth[2]]) for i in range(len(res2))]
 
-            dist_prev = 3.
-            passed_r = 0
-            passed_r_2 = 0
-            passed_r_idx = 0
-            in_ems_idx = np.nan
+            # get soi of ems entries
+            in_ems_idx = []
+            hit = 0
+            if dist[0] < r:
+                inside = 1
+            else:
+                inside = 0
             for idx_ems, value in enumerate(dist):
-                if value < r and passed_r == 0:
-                    pass
+
+                # if we are inside SOI of EMS
+                if value < r:
+                    if inside == 1:  # we were previously inside as well
+                        pass
+                    else:  # we were previously outside
+                        inside = 1
+                        if orbit_l2_close['cj'].iloc[j] >= 3.00033 and hit == 0:
+                            in_ems_idx.append(idx_ems)
+                            hit = 1
+                        elif orbit['cj'].iloc[i] >= 3.00033 and hit == 1:
+                            pass
+                        else:
+                            in_ems_idx.append(idx_ems)
+                            # we are outside the EMS
                 else:
-                    passed_r = 1
-                    if passed_r_2 == 0:
-                        passed_r_idx = idx_ems
-                        passed_r_2 = 1
-                    dist_curr = value - r
-                    if dist_curr * dist_prev < 0:  # crossed Soi of EMS
-                        in_ems_idx = idx_ems
-                        break
-                    else:
-                        dist_prev = dist_curr.copy()
-            if not np.isnan(in_ems_idx):
+                    # we were just inside the SOI of the EMS, we are exiting
+                    inside = 0
+
+            if in_ems_idx:
                 # plt.plot(res[passed_r_idx:in_ems_idx, 0], res[passed_r_idx:in_ems_idx, 1], 'red')
                 # plt.scatter(res[in_ems_idx, 0], res[in_ems_idx, 1])
-                temp = np.append(res[in_ems_idx, :], 1)
-                ems_state.append(temp)
+                for idxs in range(len(in_ems_idx)):
+                    temp = np.append(res2[in_ems_idx[idxs], :], 1)
+                    ems_state.append(temp)
 
         l12_pd = pd.DataFrame(ems_state, columns=['x', 'y', 'z', 'vx', 'vy', 'vz', 'L'])
         cj_ems = jacobi(l12_pd.iloc[0, :6], mu)
-        ems_file_path = os.path.join(os.getcwd(), 'States_at_EMS')
+        ems_file_path = os.path.join(os.getcwd(), 'States_at_EMS_new')
         l12_pd.to_csv(ems_file_path + '/' + format(cj_ems, ".15f") + '.csv', sep=' ', header=True, index=False)
-        plt.show()
+
+        # plt.show()
         # plt.savefig('Figures/' + format(cj_ems, ".15f") + '.svg', format='svg')
         # plt.close()
         print("Saved file: " + str(cj_ems))
