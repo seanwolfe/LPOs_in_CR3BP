@@ -195,6 +195,22 @@ def alpha_beta_jacobi_from_manifolds():
 #
 #
 #
-alpha_beta_jacobi_from_manifolds()
+# alpha_beta_jacobi_from_manifolds()
 # reverse_alpha_beta_jacobi()
 
+all_data = pd.read_csv('States_at_EMS_with_alpha_beta_new/all_paths.csv', sep=' ', header=0, names=['x', 'y', 'z', 'vx', 'vy', 'vz', 'L', 'alpha_I', 'beta_I', 'jacobi'])
+
+#c_j > 3.0008
+all_data_8 = all_data[all_data['jacobi'] > 3.0008]
+
+fig = plt.figure()
+sc = plt.scatter(all_data_8['alpha_I'], all_data_8['beta_I'], color='#f100ff', s=15)
+# cbar = fig.colorbar(sc, label='Jacobi Constant')
+plt.xlabel(r'$\alpha_I$ (degrees)')
+plt.ylabel(r'$\beta_I$ (degrees)')
+plt.xlim([0, 360])
+plt.ylim([-180, 0])
+# plt.savefig('Figures/final_alpha_beta_pc_2.svg', format='svg')
+# plt.savefig('Figures/final_alpha_beta_pc_2.png', format='png')
+
+plt.show()
