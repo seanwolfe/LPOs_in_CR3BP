@@ -610,7 +610,7 @@ def horizontal_lyapunov_get_initial_X0(guess, mu):
 def jacobi(res, mu):
     """
 
-    :param res: the resultant state vector from a periodic orbit
+    :param res: the resultant state vector from a1 periodic orbit
     :param mu: the gravitational parameter
     :return: the jacobi constant
     """

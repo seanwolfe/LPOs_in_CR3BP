@@ -99,6 +99,7 @@ def alpha_beta_jacobi_from_manifolds():
     all_data = pd.DataFrame(np.array([all_x, all_y, all_z, all_vx, all_vy, all_vz, all_L, all_alphas, all_betas, all_jacobis]).T,
                             columns=['x', 'y', 'z', 'vx', 'vy', 'vz', 'L', 'alpha_I', 'beta_I', 'jacobi'])
 
+
     all_data.to_csv(os.getcwd() + '/States_at_EMS_with_alpha_beta_new/all_paths.csv', sep=' ', header=True, index=False)
     fig = plt.figure()
     sc = plt.scatter(all_alphas, all_betas , c=all_jacobis, cmap='gist_rainbow', s=15)
@@ -201,11 +202,36 @@ def alpha_beta_jacobi_from_manifolds():
 all_data = pd.read_csv('States_at_EMS_with_alpha_beta_new/all_paths.csv', sep=' ', header=0, names=['x', 'y', 'z', 'vx', 'vy', 'vz', 'L', 'alpha_I', 'beta_I', 'jacobi'])
 
 #c_j > 3.0008
-all_data_8 = all_data[all_data['jacobi'] > 3.0008]
+all_data_8 = all_data
+omega = 1.993722232068e-7
+time = 1 / omega
+distance = 1.49461e8
+mu = 3.040424e-6
+mu_s = 1.3271244e11
+mu_e = 3.986e3
+mu_m = 4.902e3
+mu_ems = mu_m + mu_e
+
+jacobis = []
+for idx, row in all_data_8.iterrows():
+
+    x = row['x'] * distance
+    y = row['y'] * distance
+    z = row['z'] * distance
+    vx = row['vx'] * distance / time
+    vy = row['vy'] * distance / time
+    vz = row['vz'] * distance / time
+    r_s = np.linalg.norm([row['x'] + mu, row['y'], row['z']]) * distance
+    r_ems = np.linalg.norm([row['x'] - (1 - mu), row['y'], row['z']]) * distance
+
+    jacobis.append(omega ** 2 * (x ** 2 + y ** 2) + 2 * mu_s / r_s + 2 * mu_ems / r_ems - (vx ** 2 + vy ** 2 + vz ** 2))
+
 
 fig = plt.figure()
-sc = plt.scatter(all_data_8['alpha_I'], all_data_8['beta_I'], color='#f100ff', s=15)
+# sc = plt.scatter(all_data_8['alpha_I'], all_data_8['beta_I'], color='#f100ff', s=15)
 # cbar = fig.colorbar(sc, label='Jacobi Constant')
+sc = plt.scatter(all_data_8['alpha_I'], all_data_8['beta_I'], c=jacobis, cmap='gist_rainbow', s=15)
+cbar = fig.colorbar(sc, label='Jacobi Constant')
 plt.xlabel(r'$\alpha_I$ (degrees)')
 plt.ylabel(r'$\beta_I$ (degrees)')
 plt.xlim([0, 360])
